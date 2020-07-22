@@ -43,7 +43,7 @@ import android.animation.AnimatorSet;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener, TextToSpeech.OnInitListener {
 
-    private static final int N_SAMPLES = 100;
+    private static final int N_SAMPLES = 200;
     private static List<Float> x;
     private static List<Float> y;
     private static List<Float> z;
@@ -58,6 +58,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private TextView standingTextView;
     private TextView walkingTextView;
 
+    private TextView lsTextView;
+    private TextView nsTextView;
+    private TextView ssTextView;
+
     private SearchView destinationSearchView;
     private ListView destinationListView;
     ArrayList<String> list;
@@ -65,7 +69,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     ArrayAdapter<String> adapter;
 
     private float[] results;
+    private float[] results2;
     private HARClassifier classifier;
+    private HAUClassifier HAUclassifier;
     private float[] mGravity = new float[3];
     private float[] mGeomagnetic = new float[3];
     private float azimuth = 0f;
@@ -97,8 +103,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private String[] labels = { "Running", "Standing", "Walking"};
     private ActivityClassifier activityClassifier;
+    private UnitClassifier unitClassifier;
     private DistanceEstimator distanceEstimator;
-    private int activity=0;
+    private int activity=1;
+    private int unit=3;
 
 
     @SuppressLint("ClickableViewAccessibility")
@@ -119,6 +127,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         standingTextView = (TextView) findViewById(R.id.standing_prob);
         walkingTextView = (TextView) findViewById(R.id.walking_prob);
 
+        lsTextView = (TextView) findViewById(R.id.LS_prob);
+        nsTextView = (TextView) findViewById(R.id.NS_prob);
+        ssTextView = (TextView) findViewById(R.id.SS_prob);
+
         destinationSearchView = (SearchView) findViewById(R.id.destinationSearchView);
         destinationListView = (ListView) findViewById(R.id.destinationListView);
         list = new ArrayList<String>();
@@ -129,7 +141,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         imageView = (ImageView) findViewById(R.id.imageView);
 
         classifier = new HARClassifier(getApplicationContext());
+        HAUclassifier = new HAUClassifier(getApplicationContext());
         activityClassifier = new ActivityClassifier();
+        unitClassifier = new UnitClassifier();
         distanceEstimator = new DistanceEstimator();
 
 
@@ -342,8 +356,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     protected void onResume() {
         super.onResume();
-        getSensorManager().registerListener(this, getSensorManager().getDefaultSensor(Sensor.TYPE_ACCELEROMETER),SensorManager.SENSOR_DELAY_GAME);
-        getSensorManager().registerListener(this, getSensorManager().getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), SensorManager.SENSOR_DELAY_GAME);
+        getSensorManager().registerListener(this, getSensorManager().getDefaultSensor(Sensor.TYPE_ACCELEROMETER),10000,10000);
+        getSensorManager().registerListener(this, getSensorManager().getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD), 10000,10000);
     }
 
     @Override
@@ -463,18 +477,27 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             data.addAll(z1); */
 
             results = classifier.predictProbabilities(toFloatArray(data));
+            results2 = HAUclassifier.predictProbabilities(toFloatArray(data));
 
-                runningTextView.setText(Float.toString(round(results[0], 2)));
-                standingTextView.setText(Float.toString(round(results[1], 2)));
-                walkingTextView.setText(Float.toString(round(results[2], 2))); /* */
+            runningTextView.setText(Float.toString(round(results[0], 2)));
+            standingTextView.setText(Float.toString(round(results[1], 2)));
+            walkingTextView.setText(Float.toString(round(results[2], 2))); /* */
             //getDirections();
 
+            lsTextView.setText(Float.toString(round(results2[0], 2)));
+            nsTextView.setText(Float.toString(round(results2[1], 2)));
+            ssTextView.setText(Float.toString(round(results2[2], 2)));
+
+            stepLengthX = distanceEstimator.getStepLengthX(activity, unit);
+            stepLengthY = distanceEstimator.getStepLengthY(activity, unit);
+
             activity = activityClassifier.getActivity(results);
+            unit = unitClassifier.getUnit(results2);
 
             if(activity ==0 || activity ==2) //RUN || WALK
             {
-                stepLengthX = distanceEstimator.getStepLengthX(activity);
-                stepLengthY = distanceEstimator.getStepLengthY(activity);
+                stepLengthX = distanceEstimator.getStepLengthX(activity, unit);
+                stepLengthY = distanceEstimator.getStepLengthY(activity, unit);
                 Xcpos = Xnpos;
                 Xnpos = Xnpos +  (nSteps*stepLengthX*Math.cos(Math.toRadians(azimuth)));// System.out.println("Azimuth"+(azimuth-90));
             //    System.out.println("Val"+50*Math.cos(Math.toRadians(azimuth-90)));
